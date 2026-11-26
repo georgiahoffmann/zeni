@@ -1,1 +1,4 @@
 .DS_Store
+
+# firmware (PlatformIO)
+firmware/.pio/

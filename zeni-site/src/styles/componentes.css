@@ -1377,3 +1377,222 @@
   width: 48px;
   height: 48px;
 }
+
+/* ---------- Teste ao vivo do ZENI (Bluetooth) ---------- */
+.teste {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+}
+.teste-mostrador {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border-radius: var(--radius-full);
+  background: var(--cinza-50);
+  box-shadow: var(--brilho-interno);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+/* Brilho amarelo que cresce com o movimento (o mesmo amarelo do bulb do exercício) */
+.teste-brilho {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle, var(--brand-amarelo-300) 0%, transparent 70%);
+  opacity: calc(0.15 + var(--movimento, 0) * 0.85);
+  transform: scale(calc(0.6 + var(--movimento, 0) * 0.5));
+  transition: opacity 120ms linear, transform 120ms linear;
+}
+.teste-zeni {
+  position: relative;
+  height: 150px;
+  width: auto;
+  transition: transform 66ms linear;
+}
+.teste-barra {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+.teste-barra-rotulo {
+  font: var(--type-apoio);
+  color: var(--text-rotulo);
+}
+.teste-barra-trilho {
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--cinza-100);
+  overflow: hidden;
+}
+.teste-barra-cheio {
+  display: block;
+  height: 100%;
+  background: var(--brand-amarelo-500);
+  transform-origin: left center;
+  transition: transform 120ms linear;
+}
+.teste-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.teste-linha {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font: var(--type-corpo);
+  color: var(--text-secondary);
+}
+.teste-linha--ok {
+  color: var(--text-primary);
+}
+.teste-linha-icone {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cinza-100);
+}
+.teste-linha--ok .teste-linha-icone {
+  background: var(--bg-accent);
+  color: var(--text-on-accent);
+}
+.teste-linha-icone .icone {
+  width: 24px;
+  height: 24px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .teste-zeni,
+  .teste-brilho,
+  .teste-barra-cheio {
+    transition: none;
+  }
+}
+
+/* Painel técnico (só com ?tecnico no endereço): para a equipe conferir o sinal do protótipo */
+.tecnico {
+  position: fixed;
+  left: 4px;
+  top: 4px;
+  z-index: 9999;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff;
+  font: 9px/1.3 ui-monospace, Menlo, monospace;
+  pointer-events: none;
+  white-space: pre;
+}
+
+/* Bateria do ZENI real em 20% ou menos: o ícone fica cinza-escuro, sem vermelho (avisos calmos) */
+.pilula--fraca .pilula-icone {
+  color: var(--cinza-700);
+}
+.teste-ajustar {
+  width: 100%;
+}
+
+/* ---------- Guia de posição da calibração ---------- */
+.guia {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  align-self: center;
+}
+.guia-voce circle,
+.guia-voce path {
+  fill: var(--cinza-200);
+}
+.guia-voce text,
+.guia-seta text {
+  font: var(--type-apoio);
+  font-size: 15px;
+  fill: var(--text-rotulo);
+}
+.guia-mesa {
+  stroke: var(--cinza-400);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.guia-seta path {
+  fill: none;
+  stroke: var(--text-brand);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.guia-zeni {
+  transform-box: view-box;
+}
+/* tomba 90° para longe da pessoa, fica deitado, volta (loop de 3,2 s) */
+.guia--deitar .guia-zeni {
+  animation: guia-tombar 3.2s ease-in-out infinite;
+}
+.guia--pronto .guia-zeni {
+  animation: none;
+  transform: rotate(40deg);
+}
+@keyframes guia-tombar {
+  0%, 20% {
+    transform: rotate(0deg);
+  }
+  50%, 85% {
+    transform: rotate(40deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guia--deitar .guia-zeni {
+    animation: none;
+    transform: rotate(40deg);
+  }
+}
+
+/* Teste ao vivo: duas vistas, de frente e de lado */
+.teste-vistas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  width: 100%;
+}
+.teste-vista {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+.teste-vista .teste-mostrador {
+  width: 140px;
+  height: 140px;
+}
+.teste-vista .teste-zeni {
+  height: 104px;
+}
+.teste-vista-rotulo {
+  font: var(--type-apoio);
+  color: var(--text-rotulo);
+}
+.teste-voce {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  translate: 0 -50%;
+  font: var(--type-apoio);
+  font-size: 11px;
+  color: var(--text-rotulo);
+}

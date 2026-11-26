@@ -4,13 +4,15 @@
 // Topo (decisões 10, 13 e 16 de 25/11): avatar com menu (Personalizar e Conexão com o ZENI) e pílula do ZENI.
 // Layout (25/11): tudo encostado no rodapé; o espaço que sobra no topo é preenchido pelo gradiente em bulb.
 import { useEffect, useState } from 'react'
-import { Battery0Icon, Battery50Icon, Battery100Icon, ChartBarIcon, PlayCircleIcon } from '@heroicons/react/24/outline'
+import { ChartBarIcon, PlayCircleIcon } from '@heroicons/react/24/outline'
 import AvisoConexao from '../componentes/AvisoConexao.jsx'
 import logo from '../assets/zeni-logo.svg'
 import MenuAvatar from '../componentes/MenuAvatar.jsx'
+import { IconeBateria } from '../componentes/TesteZeni.jsx'
 import { bateriaDoZeni, telaDoExercicio, zeniConectado } from '../fluxo.js'
 import { useNavegacao } from '../navegacao.jsx'
 import { CHAVES, ler } from '../storage.js'
+import { useZeni } from '../usarZeni.js'
 
 // PROVISÓRIO: a ordem e o formato dos destinos são decisão do grupo
 // (fluxo-do-app.md, "O fluxograma não define a ordem nem o formato"; design system, pendência 11).
@@ -56,7 +58,9 @@ function useContagem(alvo) {
 }
 
 // Pílula do ZENI: com conexão, o nível de bateria; sem conexão, só "ZENI desconectado" (decisão 16 de 25/11).
+// ZENI real: acompanha a conexão e a bateria ao vivo. Se o ZENI não mede a bateria, mostra "ZENI conectado".
 function PilulaZeni() {
+  useZeni() // re-renderiza quando a conexão ou a bateria do ZENI real mudam
   if (!zeniConectado()) {
     return (
       <p className="pilula pilula--desconectado" role="status">
@@ -65,10 +69,16 @@ function PilulaZeni() {
     )
   }
   const nivel = bateriaDoZeni()
-  const Icone = nivel <= 25 ? Battery0Icon : nivel <= 60 ? Battery50Icon : Battery100Icon
+  if (nivel === null || nivel === undefined) {
+    return (
+      <p className="pilula" role="status">
+        ZENI conectado
+      </p>
+    )
+  }
   return (
-    <p className="pilula" role="status">
-      <Icone className="icone pilula-icone" aria-hidden="true" />
+    <p className={`pilula${nivel <= 20 ? ' pilula--fraca' : ''}`} role="status">
+      <IconeBateria nivel={nivel} className="icone pilula-icone" />
       <span className="sr-only">Bateria do ZENI: </span>
       {nivel}%
     </p>

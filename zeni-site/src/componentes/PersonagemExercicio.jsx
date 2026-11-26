@@ -14,6 +14,7 @@ import * as THREE from 'three'
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { clone as clonarComEsqueleto } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import modelo from '../assets/zeni-personagem.glb?url'
+import { alturaDoZeni, conectado as zeniConectadoAgora, MODO_DO_EXERCICIO, rotacaoDoZeni } from '../zeni-dispositivo.js'
 
 const CLIPES = {
   A: 'A_girar_o_punho',
@@ -172,7 +173,78 @@ function medirMesa(raiz, zeni, clip, socket) {
   return achado
 }
 
-function Personagem({ exercicio, parado, vista }) {
+// Fantasma do ZENI real: uma cópia translúcida virada como o ZENI de verdade está agora (inclinação absoluta; a direção
+// em torno da vertical é zerada a cada Começar). O personagem é a pessoa, sem espelho.
+// Cor: o quão perto o ZENI real está do CAMINHO da animação (a menor distância até qualquer pose do clipe, não até a pose
+// daquele instante, para não punir quem está um pouco adiantado ou atrasado). Perto = verde, no meio = amarelo, longe =
+// coral, com passagem suave. Em B e D (levantar e tocar na mesa), o fantasma também sobe e desce com a altura real,
+// medida pela aceleração; nos outros, ele fica na mão do personagem (o sensor não mede posição, só giro e inclinação).
+const PERTO_GRAUS = 15
+const LONGE_GRAUS = 45
+
+function FantasmaZeni({ zeni, trajetoria, exercicioId }) {
+  const ref = useRef(null)
+  const material = useRef(null)
+  const cores = useMemo(
+    () => ({ perto: new THREE.Color(token('--fantasma-perto')), meio: new THREE.Color(token('--fantasma-meio')), longe: new THREE.Color(token('--fantasma-longe')) }),
+    [],
+  )
+  const tmp = useMemo(() => ({ alvo: new THREE.Quaternion(), p: new THREE.Vector3(), cor: new THREE.Color() }), [])
+  const vertical = ['vertical', 'batida'].includes(MODO_DO_EXERCICIO[exercicioId])
+  useFrame(() => {
+    const f = ref.current
+    if (!f) return
+    f.visible = zeniConectadoAgora()
+    if (!f.visible) return
+    tmp.alvo.fromArray(rotacaoDoZeni())
+    f.quaternion.slerp(tmp.alvo, 0.5) // suaviza um pouco o tremido na tela
+
+    if (vertical && trajetoria) {
+      f.position.copy(trajetoria.inicio)
+      f.position.y += alturaDoZeni()
+    } else {
+      zeni.getWorldPosition(tmp.p)
+      f.position.copy(tmp.p)
+    }
+
+    if (trajetoria && material.current) {
+      let menor = Math.PI
+      for (const q of trajetoria.poses) menor = Math.min(menor, 2 * Math.acos(Math.min(1, Math.abs(q.dot(tmp.alvo)))))
+      const graus = THREE.MathUtils.radToDeg(menor)
+      const t = THREE.MathUtils.clamp((graus - PERTO_GRAUS) / (LONGE_GRAUS - PERTO_GRAUS), 0, 1)
+      if (t < 0.5) tmp.cor.copy(cores.perto).lerp(cores.meio, t * 2)
+      else tmp.cor.copy(cores.meio).lerp(cores.longe, (t - 0.5) * 2)
+      material.current.color.lerp(tmp.cor, 0.15)
+      material.current.emissive.copy(material.current.color)
+    }
+  })
+  return (
+    // desenhado por cima da mão (depthTest desligado) e um pouco maior, para ler como um contorno brilhante
+    <mesh ref={ref} geometry={zeni.geometry} renderOrder={10} scale={1.08}>
+      <meshStandardMaterial ref={material} color={cores.meio} emissive={cores.meio} emissiveIntensity={0.5} roughness={1} metalness={0} transparent opacity={0.55} depthWrite={false} depthTest={false} />
+    </mesh>
+  )
+}
+
+// Poses do ZENI ao longo de um clipe (orientação no mundo), e onde ele está no começo: para a cor e a altura do fantasma
+function medirTrajetoria(raiz, zeni, clip) {
+  const mixer = new THREE.AnimationMixer(raiz)
+  mixer.clipAction(clip).play()
+  const poses = []
+  let inicio = null
+  for (let i = 0; i < 36; i++) {
+    mixer.setTime((clip.duration * i) / 36)
+    raiz.updateMatrixWorld(true)
+    poses.push(zeni.getWorldQuaternion(new THREE.Quaternion()))
+    if (i === 0) inicio = zeni.getWorldPosition(new THREE.Vector3())
+  }
+  mixer.stopAllAction()
+  mixer.uncacheClip(clip)
+  mixer.uncacheRoot(raiz)
+  return { poses, inicio }
+}
+
+function Personagem({ exercicio, parado, vista, fantasma }) {
   const gltf = useGLTF(modelo, false, false)
   const invalidate = useThree((s) => s.invalidate)
 
@@ -213,6 +285,13 @@ function Personagem({ exercicio, parado, vista }) {
       return f
     })
   }, [gltf])
+
+  // Caminho do ZENI em cada clipe, para o fantasma
+  const trajetorias = useMemo(() => {
+    const t = {}
+    for (const id of Object.keys(CLIPES)) t[id] = medirTrajetoria(raiz, zeni, clipes.find((c) => c.name === CLIPES[id]))
+    return t
+  }, [raiz, zeni, clipes])
 
   // Onde fica a mesa em D e F, medido no clipe
   const mesas = useMemo(() => {
@@ -285,6 +364,7 @@ function Personagem({ exercicio, parado, vista }) {
   return (
     <>
       <primitive object={raiz} />
+      {fantasma && <FantasmaZeni zeni={zeni} trajetoria={trajetorias[exercicio.id]} exercicioId={exercicio.id} />}
       {mesa && (
         // linha de mesa suave, na altura onde a base do ZENI toca no ponto mais baixo do movimento
         <mesh position={[mesa.x, mesa.y - 0.005, mesa.z]} rotation={[0, angulo, 0]}>
@@ -323,7 +403,8 @@ function Luzes() {
   )
 }
 
-export default function PersonagemExercicio({ exercicio, parado, pulso = false, vista = VISTA }) {
+// `fantasma`: mostra o ZENI real (translúcido) junto da animação. Só com o ZENI de verdade conectado.
+export default function PersonagemExercicio({ exercicio, parado, pulso = false, vista = VISTA, fantasma = false }) {
   const [visivel, setVisivel] = useState(() => !document.hidden)
   useEffect(() => {
     const f = () => setVisivel(!document.hidden)
@@ -339,7 +420,7 @@ export default function PersonagemExercicio({ exercicio, parado, pulso = false, 
       <div className="personagem-quadro">
       <Canvas
         dpr={[1, 2]} // devicePixelRatio limitado a 2
-        frameloop={parado ? 'demand' : visivel ? 'always' : 'never'}
+        frameloop={!visivel ? 'never' : parado && !fantasma ? 'demand' : 'always'}
         gl={{ alpha: true, antialias: true }}
         camera={{ position: vista.posicao, fov: 29, near: 0.1, far: 20 }}
         onCreated={({ camera }) => camera.lookAt(...vista.alvo)}
@@ -347,7 +428,7 @@ export default function PersonagemExercicio({ exercicio, parado, pulso = false, 
         <Camera vista={vista} />
         <Luzes />
         <Suspense fallback={null}>
-          <Personagem exercicio={exercicio} parado={parado} vista={vista} />
+          <Personagem exercicio={exercicio} parado={parado} vista={vista} fantasma={fantasma} />
         </Suspense>
       </Canvas>
       </div>

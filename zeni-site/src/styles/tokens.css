@@ -43,6 +43,12 @@
   --brand-seixo: #C4C4C4;
   --brand-porcelana: #F5FAFE;
 
+  /* Fantasma do ZENI real no exercício (26/11/2026, pedido do grupo; provisório até o teste com usuários, ver design
+     system, pendência 5): a cor diz o quão perto o ZENI de verdade está do movimento pedido. Tons suaves, sem alarme. */
+  --fantasma-perto: #7CC99A;
+  --fantasma-meio: var(--brand-amarelo-400);
+  --fantasma-longe: #EE9A7E;
+
   /* Semânticos */
   --bg-page: var(--white);
   --bg-subtle: var(--brand-porcelana);

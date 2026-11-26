@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Abertura from './componentes/Abertura.jsx'
+import PainelTecnico from './componentes/PainelTecnico.jsx'
 import AvisoLembrete from './componentes/AvisoLembrete.jsx'
 import { telaDoExercicio } from './fluxo.js'
 import { lembreteDeAgora, lerLembretes } from './lembretes.js'
@@ -7,6 +8,9 @@ import AvisoWeb from './telas/AvisoWeb.jsx'
 import { NavegacaoProvider, useNavegacao } from './navegacao.jsx'
 import EmConstrucao from './telas/EmConstrucao.jsx'
 import { TELAS } from './telas/index.js'
+import { reconectarLembrado } from './zeni-dispositivo.js'
+
+const TECNICO = new URLSearchParams(window.location.search).has('tecnico')
 
 function Telas() {
   const { tela, ir } = useNavegacao()
@@ -18,6 +22,11 @@ function Telas() {
     const rever = () => setAbrindo(true)
     window.addEventListener('zeni:abertura', rever)
     return () => window.removeEventListener('zeni:abertura', rever)
+  }, [])
+
+  // ZENI real: se o navegador lembra dele (Chrome), reconecta sozinho ao abrir o app, sem a lista de aparelhos
+  useEffect(() => {
+    reconectarLembrado()
   }, [])
 
   // Lembretes: a cada 15 s vê se algum é para este minuto (só com o app aberto na v1)
@@ -44,6 +53,7 @@ function Telas() {
   return (
     <div className="app">
       {abrindo && <Abertura onFim={() => setAbrindo(false)} />}
+      {TECNICO && <PainelTecnico />}
       {/* A Home fica por baixo do painel; enquanto ele está aberto, não recebe toque nem foco. */}
       <div inert={painelAberto}>
         <Home />
@@ -65,7 +75,8 @@ function Telas() {
 // Computador = tela larga com mouse (ponteiro preciso). Celular e tablet em pé seguem para o app.
 // iPad (com ou sem mouse) tem toque (maxTouchPoints > 0) e fica no app; só o computador sem toque vê o aviso.
 const CONSULTA_COMPUTADOR = '(min-width: 900px) and (pointer: fine)'
-const ehComputador = () => window.matchMedia(CONSULTA_COMPUTADOR).matches && navigator.maxTouchPoints === 0
+// Com `?tecnico`, o computador abre o app (a equipe testa o ZENI pelo Chrome do notebook).
+const ehComputador = () => !TECNICO && window.matchMedia(CONSULTA_COMPUTADOR).matches && navigator.maxTouchPoints === 0
 
 export default function App() {
   const [computador, setComputador] = useState(ehComputador)

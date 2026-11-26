@@ -19,6 +19,8 @@ import PainelInferior from '../componentes/PainelInferior.jsx'
 import TelaCarregamento from '../componentes/TelaCarregamento.jsx'
 import { useNavegacao } from '../navegacao.jsx'
 import { aliviarDificuldade, aoBateriaFraca, aoMudarSinal, emDificuldade, serieDoDia } from '../simulacao.js'
+import { zeniReal } from '../fluxo.js'
+import * as dispositivo from '../zeni-dispositivo.js'
 import { CHAVES, guardar, ler } from '../storage.js'
 import { useComandosDeVoz } from '../voz.js'
 
@@ -60,6 +62,7 @@ export default function Exercicio() {
   const [desfazer, setDesfazer] = useState(false)
   const [motivoPausa, setMotivoPausa] = useState('pessoa') // 'pessoa' | 'dificuldade'
   const [bateria, setBateria] = useState(false)
+  const [ajuste, setAjuste] = useState(0) // "Ajustar o ZENI": quanto tempo já ficou parado de pé (0 a 1)
 
   const exercicio = serie[indice]
   const ritmoSeg = exercicio.ritmoSeg ?? ritmoHabitualSeg
@@ -68,7 +71,10 @@ export default function Exercicio() {
   const restamRef = useRef(DURACAO_S)
   const indiceRef = useRef(0)
   const desdeAmostra = useRef(0) // a detecção de dificuldade só olha amostras depois da última pausa automática
-  const dados = useRef({ amostras: [], pausas: 0 }) // do exercício em andamento
+  const dados = useRef({ amostras: [], oscilacao: [], tremores: [], pausas: 0 }) // do exercício em andamento
+  const jaComecou = useRef(false) // para a reconexão saber se volta à instrução ou ao exercício
+  const [real] = useState(zeniReal) // ZENI de verdade (Bluetooth) ou simulação
+  useEffect(() => () => dispositivo.definirExercicio(null), []) // ao sair, o teste ao vivo volta ao modo geral
   const feitos = useRef([]) // exercícios concluídos nesta série
 
   const pausar = () => {
@@ -80,16 +86,33 @@ export default function Exercicio() {
   // Carregamento: espera simulada
   useEffect(() => {
     if (estado !== 'preparando') return undefined
-    const id = setTimeout(() => setEstado('instrucao'), PREPARO_MS)
+    // ZENI real sem conexão (desligou entre a Home e aqui): já entra reconectando
+    const id = setTimeout(() => setEstado(real && !dispositivo.conectado() ? 'reconectando' : 'instrucao'), PREPARO_MS)
     return () => clearTimeout(id)
-  }, [estado, tentativaBusca])
+  }, [estado, tentativaBusca, real])
+
+  // "Ajustar o ZENI" (ZENI real): segurar de pé e parado por 1,5 s. Essa vira a posição de pé do fantasma e das medidas.
+  const ajustar = () => {
+    setAjuste(0)
+    setEstado('ajustando')
+    dispositivo
+      .calibrarDePe(1500, setAjuste)
+      .catch(() => {})
+      .finally(() => setEstado((e) => (e === 'ajustando' ? 'instrucao' : e)))
+  }
 
   // Começa um exercício: zera o relógio e os dados de movimento
   const comecar = () => {
     restamRef.current = duracao
     setRestam(duracao)
-    dados.current = { amostras: [], pausas: 0 }
+    dados.current = { amostras: [], oscilacao: [], tremores: [], pausas: 0 }
     desdeAmostra.current = 0
+    jaComecou.current = true
+    if (real) {
+      dispositivo.definirExercicio(serie[indiceRef.current].id) // giro, vertical ou batida, conforme o exercício
+      dispositivo.fecharJanela() // descarta o movimento de antes do Começar
+      dispositivo.marcarReferencia() // a posição de agora é tomada como "de pé": dela partem o fantasma e as medidas
+    }
     setEstado('andamento')
   }
 
@@ -106,6 +129,8 @@ export default function Exercicio() {
     feitos.current.push({
       exercicio: serie[indiceRef.current].id,
       amostras: dados.current.amostras,
+      oscilacao: real ? dados.current.oscilacao : undefined,
+      tremores: real ? dados.current.tremores : undefined,
       pausas: dados.current.pausas,
       duracaoSeg: duracao,
       ritmoSeg: serie[indiceRef.current].ritmoSeg ?? ritmoHabitualSeg,
@@ -113,21 +138,33 @@ export default function Exercicio() {
     if (indiceRef.current < serie.length - 1) {
       indiceRef.current += 1
       setIndice(indiceRef.current)
+      jaComecou.current = false
       setEstado('instrucao')
     } else {
       ir('avaliacao', { resumo: { exercicios: feitos.current, ritmoSeg: ritmoHabitualSeg } })
     }
   }
 
-  // 2.4 a 2.7: o ciclo do exercício. Dados de movimento gerados pelo app.
+  // 2.4 a 2.7: o ciclo do exercício. Com o ZENI real, os dados vêm do sensor (src/zeni-dispositivo.js, uma janela a
+  // cada 250 ms); na simulação, são gerados pelo app.
   useEffect(() => {
     if (estado !== 'andamento') return undefined
     const t0 = Date.now()
+    if (real) dispositivo.fecharJanela() // não conta o que aconteceu durante a pausa
     const dado = setInterval(() => {
       const t = (Date.now() - t0) / 1000
-      const valor = emDificuldade()
-        ? 8 + Math.random() * 10 // movimento muito pequeno (simulado)
-        : 55 + 25 * Math.sin((2 * Math.PI * t) / ritmoSeg) + Math.random() * 8
+      let valor
+      if (real) {
+        const janela = dispositivo.fecharJanela()
+        if (!janela) return // sem pacotes nesta janela: o sinal caiu, a reconexão cuida disso
+        valor = janela.tamanho
+        dados.current.oscilacao.push(Math.round(janela.oscilacao * 1000) / 1000)
+        dados.current.tremores.push(Math.round(janela.tremor))
+      } else {
+        valor = emDificuldade()
+          ? 8 + Math.random() * 10 // movimento muito pequeno (simulado)
+          : 55 + 25 * Math.sin((2 * Math.PI * t) / ritmoSeg) + Math.random() * 8
+      }
       const limitado = Math.max(0, Math.min(100, valor))
       setTamanho(limitado)
       const amostras = dados.current.amostras
@@ -161,7 +198,7 @@ export default function Exercicio() {
       aoMudarSinal((ok) => {
         if (!ok) setEstado((e) => (e === 'andamento' ? 'reconectando' : e))
         else {
-          setEstado((e) => (e === 'reconectando' ? 'andamento' : e))
+          setEstado((e) => (e === 'reconectando' ? (jaComecou.current ? 'andamento' : 'instrucao') : e))
           setTentativa(1)
         }
       }),
@@ -244,7 +281,14 @@ export default function Exercicio() {
         alturaTotal
         onFechar={() => {}}
         rodape={
-          <AcoesDuplas voltar={{ rotulo: 'Voltar', onClick: encerrarSessao }} acao={{ rotulo: 'Começar', onClick: comecar }} />
+          <>
+            {real && (
+              <Botao variante="vazado" onClick={ajustar}>
+                Ajustar o ZENI
+              </Botao>
+            )}
+            <AcoesDuplas voltar={{ rotulo: 'Voltar', onClick: encerrarSessao }} acao={{ rotulo: 'Começar', onClick: comecar }} />
+          </>
         }
       >
         <div className="instrucao">
@@ -252,10 +296,35 @@ export default function Exercicio() {
           <h2 className="instrucao-nome">{exercicio.nome}</h2>
           <div className="instrucao-figura">
             <Suspense fallback={null}>
-              <PersonagemExercicio exercicio={exercicio} parado={parado} pulso={exercicio.grupo === 'ritmo'} />
+              <PersonagemExercicio exercicio={exercicio} parado={parado} pulso={exercicio.grupo === 'ritmo'} fantasma={real} />
             </Suspense>
           </div>
           <p className="instrucao-legenda">{exercicio.legenda}</p>
+        </div>
+      </PainelInferior>
+    )
+  }
+
+  // Ajustar o ZENI: segurar de pé, parado
+  if (estado === 'ajustando') {
+    return (
+      <PainelInferior
+        titulo="Ajustar o ZENI"
+        alturaTotal
+        onFechar={() => setEstado('instrucao')}
+        rodape={
+          <Botao variante="voltar" onClick={() => setEstado('instrucao')}>
+            Voltar
+          </Botao>
+        }
+      >
+        <h2 className="conectar-titulo">Segure o ZENI de pé</h2>
+        <p className="conectar-texto">Do jeito que você vai começar, parado, por um instante.</p>
+        <div className="teste-barra" role="progressbar" aria-label="Parado" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(ajuste * 100)}>
+          <span className="teste-barra-rotulo">Parado</span>
+          <span className="teste-barra-trilho">
+            <span className="teste-barra-cheio" style={{ transform: `scaleX(${ajuste})` }} />
+          </span>
         </div>
       </PainelInferior>
     )
@@ -342,7 +411,7 @@ export default function Exercicio() {
           <h2 className="instrucao-nome">{exercicio.nome}</h2>
           <div className="instrucao-figura">
             <Suspense fallback={null}>
-              <PersonagemExercicio exercicio={exercicio} parado={parado} pulso={exercicio.grupo === 'ritmo'} />
+              <PersonagemExercicio exercicio={exercicio} parado={parado} pulso={exercicio.grupo === 'ritmo'} fantasma={real} />
             </Suspense>
           </div>
           <p className="instrucao-legenda">{exercicio.legenda}</p>
@@ -414,7 +483,7 @@ export default function Exercicio() {
           aria-hidden="true"
         />
         <Suspense fallback={null}>
-          <PersonagemExercicio exercicio={exercicio} parado={parado} />
+          <PersonagemExercicio exercicio={exercicio} parado={parado} fantasma={real} />
         </Suspense>
       </div>
     </PainelInferior>

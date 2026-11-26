@@ -4,7 +4,7 @@ Este arquivo registra **onde cada cor é usada** no site. A origem das cores é 
 
 Última atualização: 26/11/2026.
 
-Regras gerais: só tokens, nunca hex solto fora de `tokens.css`; sem vermelho nem verde; texto sobre gradiente é `cinza-900` (exceto onde indicado); gradientes só em tons claros.
+Regras gerais: só tokens, nunca hex solto fora de `tokens.css`; sem vermelho nem verde (exceção provisória: o fantasma do ZENI real, seção 5); texto sobre gradiente é `cinza-900` (exceto onde indicado); gradientes só em tons claros.
 
 ## 1. Paleta
 
@@ -114,6 +114,11 @@ Regras gerais: só tokens, nunca hex solto fora de `tokens.css`; sem vermelho ne
 | Personagem 3D: o ZENI | `brand-bruma` |
 | Personagem 3D: céu / chão | `white` / `cinza-100` |
 | Personagem 3D: linha de mesa (exercícios D e F) | `cinza-300` |
+| Personagem 3D: fantasma do ZENI real (só com o ZENI conectado) | translúcido (55%), com brilho da mesma cor; muda suave de `fantasma-perto` (verde suave, #7CC99A) a `fantasma-meio` (`amarelo-400`) a `fantasma-longe` (coral suave, #EE9A7E) conforme o ZENI real se afasta do caminho do exercício (até 15°: verde; 45° ou mais: coral) |
+| Teste ao vivo do ZENI (conexão): mostradores | fundo `cinza-50` com `--brilho-interno`; brilho `amarelo-300` que cresce com o movimento; desenho do ZENI (silhueta) |
+| Teste ao vivo: barra de movimento e barras de "parado" da calibração | trilho `cinza-100`, preenchimento `amarelo-500`, rótulo `text-rotulo` |
+| Teste ao vivo: lista de verificação | ícone em círculo `cinza-100` (pendente) ou `bg-accent` com `text-on-accent` (ok); texto `text-secondary` / `text-primary` |
+| Guia de posição da calibração (desenho) | "você" em `cinza-200`, rótulos `text-rotulo`, mesa `cinza-400`, seta `text-brand` |
 
 ## 4.1 Brilho interno
 
@@ -135,6 +140,7 @@ Texto corrido e valores (`text-primary`), texto dos botões, texto de avisos (in
 
 | Data | Mudança |
 |---|---|
+| 26/11/2026 | Novos tokens `--fantasma-perto` (#7CC99A), `--fantasma-meio` (`amarelo-400`) e `--fantasma-longe` (#EE9A7E) para a cor do fantasma do ZENI real no exercício, a pedido do grupo. Primeiro verde e primeiro tom avermelhado da paleta; provisórios até o teste com usuários (design system, pendência 5). Teste ao vivo e guia de calibração registrados na seção 5 (só tokens existentes). |
 | 26/11/2026 | Bulb da home: de `amarelo-200` para `porcelana`. |
 | 26/11/2026 | Glow branco interno (`--brilho-interno`, 30 px, branco 70%) no painel do dashboard, nos cartões de suavidade e ritmo e nos dois cartões da home. |
 | 26/11/2026 | Cartões de suavidade e ritmo: de `cinza-100`→`cinza-300` para `cinza-50`→`cinza-200`. |

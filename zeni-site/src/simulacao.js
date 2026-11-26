@@ -8,7 +8,7 @@
 //   zeniSimular.bateriaFraca()       -> o ZENI avisa que a bateria está acabando (durante o exercício)
 //   zeniSimular.muitaDificuldade()   -> o movimento fica bem pequeno e o app pausa o exercício sozinho
 //   zeniSimular.lembrarAgora()       -> mostra o aviso de lembrete agora (o horário só muda de 30 em 30 min)
-// Bluetooth real fica para depois.
+// O ZENI de verdade, por Bluetooth, está em src/zeni-dispositivo.js. Sem Bluetooth no navegador, vale esta simulação.
 import { CHAVES, apagar, guardar } from './storage.js'
 
 // Catálogo de exercícios (decisão 9 de 25/11). Nomes e legendas em linguagem leiga.
@@ -55,6 +55,10 @@ export const emDificuldade = () => dificuldade
 export const aliviarDificuldade = () => {
   dificuldade = false
 }
+
+// O ZENI real (src/zeni-dispositivo.js) usa os mesmos eventos: as telas não sabem se é simulação ou Bluetooth.
+export const emitirSinal = (valor) => definirSinal(valor)
+export const emitirBateriaFraca = () => ouvintesBateria.forEach((f) => f())
 
 export function aoMudarSinal(f) {
   ouvintes.add(f)
